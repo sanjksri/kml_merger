@@ -5,10 +5,20 @@ import xml.etree.ElementTree as ET
 
 # --- HELPER FUNCTIONS ---
 
-def get_drive_id(url):
-    """Extracts the unique file ID from a Google Drive URL."""
-    match = re.search(r'(?:/d/|id=)([a-zA-Z0-9_-]+)', url)
-    return match.group(1) if match else None
+def get_drive_id(input_string):
+    """Extracts the file ID from a URL, or returns the ID if provided directly."""
+    # First, check if the input contains a typical Google Drive URL structure
+    match = re.search(r'(?:/d/|id=)([a-zA-Z0-9_-]+)', input_string)
+    if match:
+        return match.group(1)
+    
+    # If not a URL, check if the string itself looks like a valid Drive ID
+    # Google Drive IDs are typically long strings of letters, numbers, hyphens, and underscores.
+    if re.match(r'^[a-zA-Z0-9_-]{15,}$', input_string):
+        return input_string
+        
+    # If it matches neither, it's invalid
+    return None
 
 def download_kml_from_drive(file_id):
     """Downloads the raw file content from Google Drive."""
@@ -51,37 +61,35 @@ def merge_kml_contents(kml_contents):
 st.set_page_config(page_title="KML Merger App", page_icon="🌍")
 
 st.title("🌍 Google Drive KML Merger")
-st.write("Paste your publicly viewable Google Drive KML links below (one per line).")
+st.write("Paste your publicly viewable Google Drive KML **links** or **File IDs** below (one per line).")
 
-urls_input = st.text_area("Google Drive URLs", height=150)
+urls_input = st.text_area("Google Drive URLs or IDs", height=150)
 
 if st.button("Merge KMLs"):
-    urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
+    inputs = [line.strip() for line in urls_input.split('\n') if line.strip()]
     
-    if not urls:
-        st.warning("Please enter at least one URL.")
+    if not inputs:
+        st.warning("Please enter at least one URL or File ID.")
     else:
         downloaded_contents = []
-        total_urls = len(urls)
+        total_inputs = len(inputs)
         
-        # Initialize the progress bar
         progress_bar = st.progress(0, text="Starting download...")
         
-        for i, url in enumerate(urls):
-            file_id = get_drive_id(url)
+        for i, user_input in enumerate(inputs):
+            file_id = get_drive_id(user_input)
             if file_id:
                 content = download_kml_from_drive(file_id)
                 if content:
                     downloaded_contents.append(content)
             
             # Update progress bar dynamically
-            progress_percentage = int(((i + 1) / total_urls) * 100)
+            progress_percentage = int(((i + 1) / total_inputs) * 100)
             progress_bar.progress(progress_percentage, text=f"Processing files... {progress_percentage}%")
             
         if downloaded_contents:
             merged_xml = merge_kml_contents(downloaded_contents)
             
-            # Clear the progress bar and show a single success message
             progress_bar.empty()
             st.success("Merging complete!")
             
@@ -93,4 +101,4 @@ if st.button("Merge KMLs"):
             )
         else:
             progress_bar.empty()
-            st.error("Could not process any of the provided URLs. Please ensure the links are public.")
+            st.error("Could not process any of the provided inputs. Please ensure the links/IDs are public and valid.")
